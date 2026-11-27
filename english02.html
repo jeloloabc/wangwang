@@ -129,7 +129,7 @@
   <div class="control-panel" id="controlPanel">
     <div class="input-group" style="flex: 0 0 180px;">
       <label>背景图片路径</label>
-      <input type="text" id="bgInput" value="images/0.jpg" placeholder="例如：images/1.jpg">
+      <input type="text" id="bgInput" value="images/0.png" placeholder="例如：images/1.jpg">
     </div>
     
     <div class="input-group" style="flex: 2;">
@@ -230,7 +230,7 @@
   var currentData = { bg: '', words: [] };
 
   function renderCanvas(data, isEdit) {
-    canvasArea.style.backgroundImage = 'url(' + (data.bg || 'images/0.jpg') + ')';
+    canvasArea.style.backgroundImage = 'url(' + (data.bg || 'images/0.png') + ')';
     canvasArea.innerHTML = '';
 
     data.words.forEach(function(w) {
