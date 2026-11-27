@@ -1,1 +1,443 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>互动单词贴纸</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    background: #e9eef5;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
 
+  /* 顶部控制面板 */
+  .control-panel {
+    background: #fff;
+    padding: 16px 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    z-index: 100;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-start;
+    flex-shrink: 0;
+  }
+  .input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+    min-width: 200px;
+  }
+  .input-group label { font-size: 13px; font-weight: 600; color: #1d3a5a; }
+  input[type="text"], textarea {
+    padding: 8px 12px;
+    border: 1px solid #d6e4f2;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    background: #f9fcff;
+  }
+  textarea { resize: vertical; height: 100px; font-family: monospace; }
+  input:focus, textarea:focus { outline: none; border-color: #5a9bd4; background: #fff; }
+  
+  .btn {
+    background: #2b6cb0; color: #fff; border: none; border-radius: 8px;
+    padding: 10px 20px; font-size: 14px; font-weight: 600; cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn:hover { background: #245a94; }
+  .btn.secondary { background: #e2effb; color: #1f4970; }
+  .btn.secondary:hover { background: #cfe2f5; }
+
+  .share-box {
+    display: none;
+    width: 100%;
+    background: #edf7ee;
+    border: 1px solid #b7e0b9;
+    padding: 10px;
+    border-radius: 8px;
+    margin-top: 10px;
+    word-break: break-all;
+  }
+  .share-box input { width: 100%; padding: 8px; border: 1px solid #cfe8d0; border-radius: 4px; color: #1f4970; font-size: 13px; margin-bottom: 8px; }
+
+  /* 画布区域 */
+  .canvas-wrapper {
+    flex: 1;
+    position: relative;
+    background: #cbd5e1;
+    overflow: hidden; /* 隐藏超出的部分 */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  /* 严格控制画布容器比例 */
+  .canvas-area {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    /* 背景图铺满，使用 100% 100% 确保没有留白和错位 */
+    background-size: 100% 100%;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+
+  /* 单词贴纸标签 */
+  .sticker {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 6px 12px 6px 6px;
+    border-radius: 100px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    cursor: grab;
+    user-select: none;
+    border: 1px solid rgba(0,0,0,0.05);
+    transform: translate(-50%, -50%); /* 以中心点定位，方便拖拽 */
+    transition: box-shadow 0.2s;
+    z-index: 10;
+  }
+  .sticker:active { cursor: grabbing; box-shadow: 0 8px 20px rgba(0,0,0,0.3); z-index: 999; }
+  .sticker.locked { cursor: default; }
+  .sticker.locked:active { cursor: default; z-index: 10; }
+
+  .speaker-btn {
+    flex-shrink: 0;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: #d9e6f5;
+    border: none;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    color: #1f4970;
+    transition: all 0.15s;
+  }
+  .speaker-btn:hover { background: #c7ddf2; }
+  .speaker-btn:active { transform: scale(0.9); }
+  .speaker-btn svg { width: 16px; height: 16px; fill: currentColor; }
+
+  .sticker-text { display: flex; flex-direction: column; line-height: 1.2; }
+  .sticker-word { font-weight: 700; font-size: 15px; color: #13293d; }
+  .sticker-info { font-size: 11px; color: #6f8daa; display: flex; gap: 4px; }
+  .sticker-info .phonetic { font-family: 'Segoe UI', sans-serif; }
+  .sticker-info .trans { font-weight: 600; color: #2b4b6e; }
+</style>
+</head>
+<body>
+
+  <!-- 控制面板 -->
+  <div class="control-panel" id="controlPanel">
+    <div class="input-group" style="flex: 0 0 180px;">
+      <label>背景图片路径</label>
+      <input type="text" id="bgInput" value="images/0.jpg" placeholder="例如：images/1.jpg">
+    </div>
+    
+    <div class="input-group" style="flex: 2;">
+      <label>粘贴单词列表 (格式：单词｜音标｜拼读｜中文)</label>
+      <textarea id="wordsInput" placeholder="yes｜/jes/｜yes｜是的&#10;no｜/nəʊ/｜nou｜不是"></textarea>
+    </div>
+
+    <div style="display: flex; gap: 10px; align-items: flex-end; padding-bottom: 4px; flex-direction: column;">
+      <button class="btn" id="genBtn">✨ 生成单词贴纸</button>
+      <button class="btn secondary" id="shareBtn" disabled>🔗 生成分享链接</button>
+    </div>
+
+    <div class="share-box" id="shareBox">
+      <input type="text" id="shareLink" readonly>
+      <button class="btn secondary" id="copyBtn" style="padding: 6px 12px; font-size: 13px;">📋 复制链接</button>
+      <span style="font-size: 12px; color: #666; margin-left: 8px;">分享给他人，打开即可查看互动卡片。</span>
+    </div>
+  </div>
+
+  <!-- 画布区域 -->
+  <div class="canvas-wrapper">
+    <div class="canvas-area" id="canvasArea">
+      <!-- 贴纸会被动态插入到这里 -->
+    </div>
+  </div>
+
+<script>
+(function(){
+  // ========== 发音引擎 ==========
+  var currentAudio = null;
+  function cleanText(t) { return (t || '').trim().replace(/[.?!]+$/g, '').trim(); }
+  function playAudio(url) {
+    return new Promise(function(resolve, reject) {
+      var audio = new Audio(url);
+      audio.oncanplaythrough = function() { resolve(audio); };
+      audio.onerror = function() { reject(new Error('error')); };
+      audio.play().catch(function(e) { reject(e); });
+      setTimeout(function() { reject(new Error('timeout')); }, 4000);
+    });
+  }
+  function speakText(text) {
+    if (!text || !text.trim()) return;
+    if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+    var clean = cleanText(text);
+    var enc = encodeURIComponent(clean);
+    
+    playAudio('https://dict.youdao.com/dictvoice?audio=' + enc + '&type=2').then(function(a){
+      currentAudio = a;
+    }).catch(function(){
+      playAudio('https://fanyi.baidu.com/gettts?lan=en&text=' + enc + '&spd=3&source=web').then(function(a){
+        currentAudio = a;
+      }).catch(function(){
+        if ('speechSynthesis' in window) {
+          var u = new SpeechSynthesisUtterance(clean);
+          u.lang = 'en-US'; u.rate = 0.9;
+          window.speechSynthesis.cancel();
+          window.speechSynthesis.speak(u);
+        }
+      });
+    });
+  }
+
+  // ========== 数据编码 ==========
+  function encodeData(obj) {
+    var json = JSON.stringify(obj);
+    var b64 = btoa(unescape(encodeURIComponent(json)));
+    return b64.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  }
+  function decodeData(str) {
+    try {
+      var b64 = str.replace(/-/g,'+').replace(/_/g,'/');
+      while (b64.length % 4) b64 += '=';
+      return JSON.parse(decodeURIComponent(escape(atob(b64))));
+    } catch(e) { return null; }
+  }
+
+  // 解析输入
+  function parseWords(text) {
+    var lines = text.split('\n');
+    var words = [];
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].trim();
+      if (!line) continue;
+      var parts = line.split(/[｜|]/).map(function(s){ return s.trim(); });
+      if (parts.length > 0 && parts[0]) {
+        words.push({
+          word: parts[0],
+          phonetic: parts[1] || '',
+          respell: parts[2] || '',
+          trans: parts[3] || ''
+        });
+      }
+    }
+    return words;
+  }
+
+  var SPEAKER_SVG = '<svg viewBox="0 0 24 24"><path d="M3 10v4c0 1.1.9 2 2 2h2.5l4.5 3.5V4.5L7.5 8H5c-1.1 0-2 .9-2 2z"/><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/><path d="M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>';
+
+  var canvasArea = document.getElementById('canvasArea');
+  var controlPanel = document.getElementById('controlPanel');
+  var shareBox = document.getElementById('shareBox');
+  var shareBtn = document.getElementById('shareBtn');
+  var genBtn = document.getElementById('genBtn');
+  
+  var currentData = { bg: '', words: [] };
+
+  // 渲染画布
+  function renderCanvas(data, isEdit) {
+    // 强制使用 100% 100% 显示背景
+    canvasArea.style.backgroundImage = 'url(' + (data.bg || 'images/0.jpg') + ')';
+    canvasArea.innerHTML = '';
+
+    data.words.forEach(function(w) {
+      var div = document.createElement('div');
+      div.className = 'sticker' + (isEdit ? '' : ' locked');
+      
+      // 如果已有坐标则使用，没有则默认居中（50%）
+      var x = w.x !== undefined ? w.x : 50;
+      var y = w.y !== undefined ? w.y : 50;
+      
+      div.style.left = x + '%';
+      div.style.top = y + '%';
+
+      div.innerHTML = 
+        '<button class="speaker-btn">' + SPEAKER_SVG + '</button>' +
+        '<div class="sticker-text">' +
+          '<div class="sticker-word">' + w.word + '</div>' +
+          '<div class="sticker-info">' +
+            (w.phonetic ? '<span class="phonetic">' + w.phonetic + '</span>' : '') +
+            (w.trans ? '<span class="trans">' + w.trans + '</span>' : '') +
+          '</div>' +
+        '</div>';
+
+      // 点击喇叭
+      var btn = div.querySelector('.speaker-btn');
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        speakText(w.word);
+      });
+
+      // 拖拽
+      if (isEdit) {
+        makeDraggable(div, w);
+      }
+
+      canvasArea.appendChild(div);
+    });
+  }
+
+  // 精确拖拽算法
+  function makeDraggable(el, dataRef) {
+    var isDragging = false;
+    var startX, startY;
+    var startLeftPercent, startTopPercent;
+
+    el.addEventListener('mousedown', dragStart);
+    el.addEventListener('touchstart', dragStart, {passive: false});
+
+    function dragStart(e) {
+      if (e.target.closest('.speaker-btn')) return;
+      isDragging = true;
+      
+      var clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+      var clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+      
+      startX = clientX;
+      startY = clientY;
+      
+      // 取当前的百分比位置
+      startLeftPercent = parseFloat(el.style.left) || 50;
+      startTopPercent = parseFloat(el.style.top) || 50;
+
+      el.style.zIndex = 1000;
+
+      document.addEventListener('mousemove', dragMove);
+      document.addEventListener('touchmove', dragMove, {passive: false});
+      document.addEventListener('mouseup', dragEnd);
+      document.addEventListener('touchend', dragEnd);
+    }
+
+    function dragMove(e) {
+      if (!isDragging) return;
+      e.preventDefault();
+
+      var clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
+      var clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
+
+      // 计算鼠标移动的像素差
+      var dx = clientX - startX;
+      var dy = clientY - startY;
+      
+      // 获取容器（图片）的宽高
+      var rect = canvasArea.getBoundingClientRect();
+      
+      // 将像素差转换为百分比
+      var deltaLeftPercent = (dx / rect.width) * 100;
+      var deltaTopPercent = (dy / rect.height) * 100;
+
+      // 计算新的百分比
+      var newLeft = startLeftPercent + deltaLeftPercent;
+      var newTop = startTopPercent + deltaTopPercent;
+
+      // 限制边界 (0% - 100%)
+      newLeft = Math.max(0, Math.min(100, newLeft));
+      newTop = Math.max(0, Math.min(100, newTop));
+
+      el.style.left = newLeft + '%';
+      el.style.top = newTop + '%';
+      
+      // 实时更新数据
+      dataRef.x = newLeft;
+      dataRef.y = newTop;
+    }
+
+    function dragEnd() {
+      if (!isDragging) return;
+      isDragging = false;
+      el.style.zIndex = '';
+      document.removeEventListener('mousemove', dragMove);
+      document.removeEventListener('touchmove', dragMove);
+      document.removeEventListener('mouseup', dragEnd);
+      document.removeEventListener('touchend', dragEnd);
+    }
+  }
+
+  // ========== 事件绑定 ==========
+  
+  genBtn.addEventListener('click', function() {
+    var bg = document.getElementById('bgInput').value.trim();
+    var wordsText = document.getElementById('wordsInput').value;
+    var words = parseWords(wordsText);
+    
+    if (!words.length) {
+      alert('请输入单词列表');
+      return;
+    }
+    
+    currentData = { bg: bg, words: words };
+    renderCanvas(currentData, true);
+    shareBtn.disabled = false;
+    shareBox.style.display = 'none';
+  });
+
+  shareBtn.addEventListener('click', function() {
+    var encoded = encodeData(currentData);
+    var baseUrl = window.location.origin + window.location.pathname;
+    var link = baseUrl + '?card=' + encoded;
+    
+    document.getElementById('shareLink').value = link;
+    shareBox.style.display = 'block';
+  });
+
+  document.getElementById('copyBtn').addEventListener('click', function() {
+    var copyText = document.getElementById('shareLink');
+    copyText.select();
+    copyText.setSelectionRange(0, 99999);
+    
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(copyText.value).then(function() {
+        var btn = document.getElementById('copyBtn');
+        btn.textContent = '✅ 已复制';
+        setTimeout(function() { btn.textContent = '📋 复制链接'; }, 1500);
+      });
+    } else {
+      document.execCommand('copy');
+      var btn = document.getElementById('copyBtn');
+      btn.textContent = '✅ 已复制';
+      setTimeout(function() { btn.textContent = '📋 复制链接'; }, 1500);
+    }
+  });
+
+  // ========== 初始化 ==========
+  window.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('wordsInput').value = 
+      'bed｜/bed/｜bei-de｜床\n' +
+      'pillow｜/ˈpɪləʊ/｜pi-lo｜枕头\n' +
+      'quilt｜/kwɪlt/｜kwi-erlt｜被子\n' +
+      'nightstand｜/ˈnaɪtstænd/｜nait-si-de｜床头柜\n' +
+      'AC｜/ˌeɪˈsiː/｜ei-si｜空调\n' +
+      'TV｜/ˌtiːˈviː/｜ti-vi｜电视\n' +
+      'chair｜/tʃeə/｜qie-er｜椅子\n' +
+      'floor｜/flɔː/｜fu-luo｜地板';
+
+    var params = new URLSearchParams(window.location.search);
+    var cardParam = params.get('card');
+    
+    if (cardParam) {
+      var data = decodeData(cardParam);
+      if (data) {
+        controlPanel.style.display = 'none';
+        renderCanvas(data, false); 
+        document.title = '互动单词卡片';
+      } else {
+        alert('分享链接解析失败或已损坏');
+      }
+    }
+  });
+
+})();
+</script>
+</body>
+</html>
