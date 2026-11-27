@@ -7,14 +7,14 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   
-  /* 页面底色保持纯黑，防止旋转后边缘漏出白色 */
+  /* 基础背景设为白色 */
   html, body {
     width: 100%;
     height: 100%;
     margin: 0;
     padding: 0;
-    background: #000;
-    overflow: hidden; /* 禁止滚动 */
+    background: #ffffff; 
+    overflow: hidden; 
     font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   }
 
@@ -47,34 +47,36 @@
   }
   .share-box input { width: 100%; padding: 8px; border: 1px solid #cfe8d0; border-radius: 4px; color: #1f4970; font-size: 13px; margin-bottom: 8px; }
 
-  /* ========== 核心画布 ========== */
+  /* ========== 核心画布容器 ========== */
   .canvas-wrapper {
-    position: absolute; /* 使用绝对定位铺满屏幕 */
+    position: absolute; 
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background: #000;
+    background: #ffffff; 
+    display: flex;
+    justify-content: center;
+    align-items: center;
   }
 
-  /* 只有编辑时，控制面板占据顶部 */
   .edit-mode .canvas-wrapper {
     top: auto;
     position: relative;
     flex: 1;
-    height: calc(100% - 200px); /* 粗略减去面板高度 */
+    height: calc(100% - 200px);
   }
 
-  /* 真正的画布 */
   .canvas-area {
     position: absolute;
-    background-size: 100% 100%; /* 100% 100% 保证图片不变形，坐标严格对应 */
+    background-size: 100% 100%; 
     background-position: center;
     background-repeat: no-repeat;
+    box-shadow: 0 0 20px rgba(0,0,0,0.05);
   }
 
-  /* 正常横屏时（手机横过来，或者电脑上） */
+  /* 正常横屏时 */
   .canvas-area {
     width: 100%;
     height: 100%;
@@ -82,12 +84,34 @@
     left: 0;
   }
 
-  /* 竖屏时的特殊处理：把画布旋转 90 度撑满屏幕，且不变形 */
+  /* 竖屏时的特殊处理：画布旋转，稍微下移避让顶部导航栏 */
   @media (orientation: portrait) {
-    /* 如果是分享模式，画布占满整个手机屏幕并旋转 */
     body.share-mode .canvas-area {
-      width: 100vh; /* 宽=屏幕的高 */
-      height: 100vw; /* 高=屏幕的宽 */
+      width: 100vh; 
+      height: 100vw; 
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, calc(-50% + 20px)) rotate(90deg);
+    }
+  }
+
+  /* 全屏状态下的完美铺满 (如果是全屏且竖屏，不需要偏移，直接居中) */
+  body:-webkit-full-screen .canvas-area,
+  body:-moz-full-screen .canvas-area,
+  body:-ms-fullscreen .canvas-area,
+  body:fullscreen .canvas-area {
+    width: 100vw;
+    height: 100vh;
+    top: 0;
+    left: 0;
+    transform: none;
+    box-shadow: none;
+  }
+  @media (orientation: portrait) {
+    body.share-mode:-webkit-full-screen .canvas-area,
+    body.share-mode:fullscreen .canvas-area {
+      width: 100vh;
+      height: 100vw;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%) rotate(90deg);
@@ -105,11 +129,10 @@
     transform: translate(-50%, -50%);
     z-index: 10;
   }
-  .sticker:active { cursor: grabbing; box-shadow: 0 8px 20px rgba(0,0,0,0.3); z-index: 999; }
+  .sticker:active { cursor: grabbing; z-index: 999; }
   .sticker.locked { cursor: default; }
   .sticker.locked:active { cursor: default; z-index: 10; }
 
-  /* 竖屏下，为了字是正的，标签反向旋转 */
   @media (orientation: portrait) {
     body.share-mode .sticker {
       transform: translate(-50%, -50%) rotate(-90deg);
@@ -131,12 +154,33 @@
   .sticker-info .phonetic { font-family: 'Segoe UI', sans-serif; }
   .sticker-info .trans { font-weight: 600; color: #2b4b6e; }
 
-  /* 竖屏提示浮窗 */
-  .toast {
-    position: fixed; top: 20%; left: 50%; transform: translateX(-50%);
-    background: rgba(0,0,0,0.8); color: #fff; padding: 10px 20px; border-radius: 30px;
-    font-size: 14px; z-index: 9999; pointer-events: none; opacity: 0; transition: opacity 0.5s;
-    display: flex; align-items: center; gap: 8px; white-space: nowrap;
+  /* ========== 右下角悬浮全屏按钮 ========== */
+  .fullscreen-btn {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 50px;
+    height: 50px;
+    background: rgba(43, 108, 176, 0.9);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 9999;
+    transition: all 0.2s;
+  }
+  .fullscreen-btn:hover { background: rgba(43, 108, 176, 1); transform: scale(1.1); }
+  .fullscreen-btn:active { transform: scale(0.9); }
+  .fullscreen-btn svg { width: 24px; height: 24px; fill: currentColor; }
+
+  /* 全屏时隐藏按钮 */
+  body:-webkit-full-screen .fullscreen-btn,
+  body:fullscreen .fullscreen-btn {
+    display: none;
   }
 </style>
 </head>
@@ -169,7 +213,12 @@
     <div class="canvas-area" id="canvasArea"></div>
   </div>
 
-  <div class="toast" id="toast">📱 请横屏使用以获得最佳体验</div>
+  <!-- 右下角全屏/横屏按钮 -->
+  <button class="fullscreen-btn" id="fsBtn" title="全屏横屏体验">
+    <svg viewBox="0 0 24 24">
+      <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+    </svg>
+  </button>
 
 <script>
 (function(){
@@ -244,11 +293,10 @@
   var shareBox = document.getElementById('shareBox');
   var shareBtn = document.getElementById('shareBtn');
   var genBtn = document.getElementById('genBtn');
-  var toast = document.getElementById('toast');
+  var fsBtn = document.getElementById('fsBtn');
   
   var currentData = { bg: '', words: [] };
 
-  // 渲染
   function renderCanvas(data, isEdit) {
     canvasArea.style.backgroundImage = 'url(' + (data.bg || 'images/0.png') + ')';
     canvasArea.innerHTML = '';
@@ -257,7 +305,6 @@
       var div = document.createElement('div');
       div.className = 'sticker' + (isEdit ? '' : ' locked');
       
-      // 如果已有坐标则使用，没有则默认居中
       var x = w.x !== undefined ? w.x : 50;
       var y = w.y !== undefined ? w.y : 50;
       
@@ -288,7 +335,6 @@
     });
   }
 
-  // 拖拽算法（兼容竖屏旋转后的坐标轴互换）
   function makeDraggable(el, dataRef) {
     var isDragging = false;
     var startX, startY;
@@ -326,19 +372,16 @@
       var dx = clientX - startX;
       var dy = clientY - startY;
       
-      // 获取容器的物理尺寸
       var rect = canvasArea.getBoundingClientRect();
       
       var deltaLeftPercent, deltaTopPercent;
       
-      // 竖屏且处于分享/旋转模式
+      // 根据是否处于全屏/竖屏状态修正坐标轴
       if (document.body.classList.contains('share-mode') && window.innerHeight > window.innerWidth) {
-        // 物理横向移动 dx 实际上是在增加本地 Y 坐标
+        // 竖屏旋转下：物理横向X对应本地的Y，物理纵向Y对应本地的-X
         deltaTopPercent = (dx / rect.width) * 100;
-        // 物理纵向移动 dy 实际上是在减少本地 X 坐标
         deltaLeftPercent = -(dy / rect.height) * 100;
       } else {
-        // 正常横屏
         deltaLeftPercent = (dx / rect.width) * 100;
         deltaTopPercent = (dy / rect.height) * 100;
       }
@@ -410,14 +453,34 @@
     }
   });
 
-  // 竖屏时的提示浮窗检测
-  function checkOrientation() {
-    if (document.body.classList.contains('share-mode') && window.innerHeight > window.innerWidth) {
-      toast.style.opacity = '1';
-      setTimeout(function(){ toast.style.opacity = '0'; }, 3000);
+  // 全屏与强制横屏 API 触发
+  fsBtn.addEventListener('click', function() {
+    var docEl = document.documentElement;
+    
+    // 1. 尝试全屏
+    var requestFullScreen = docEl.requestFullscreen || docEl.mozRequestFullScreen || docEl.webkitRequestFullScreen || docEl.msRequestFullscreen;
+    if (requestFullScreen) {
+      requestFullScreen.call(docEl).then(function() {
+        // 2. 全屏成功后，尝试强制横屏
+        if (screen.orientation && screen.orientation.lock) {
+          screen.orientation.lock('landscape').catch(function(e){
+            console.log('系统拒绝横屏锁定，依靠 CSS 旋转');
+          });
+        }
+      }).catch(function(e) {
+        console.log('全屏被拒绝', e);
+        // 如果全屏失败，尝试仅仅强制横屏
+        if (screen.orientation && screen.orientation.lock) {
+          screen.orientation.lock('landscape').catch(function(){});
+        }
+      });
+    } else {
+      // 如果不支持全屏，仅尝试强制横屏
+      if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape').catch(function(){});
+      }
     }
-  }
-  window.addEventListener('resize', checkOrientation);
+  });
 
   // ========== 初始化 ==========
   window.addEventListener('DOMContentLoaded', function() {
@@ -441,13 +504,13 @@
         controlPanel.style.display = 'none';
         renderCanvas(data, false); 
         document.title = '互动单词卡片';
-        checkOrientation();
       } else {
         alert('分享链接解析失败或已损坏');
       }
     } else {
-      // 编辑模式：允许滚动和查看
       document.body.classList.add('edit-mode');
+      // 编辑模式下不需要全屏按钮
+      fsBtn.style.display = 'none'; 
     }
   });
 
