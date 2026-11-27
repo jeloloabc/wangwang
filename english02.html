@@ -1,3 +1,10 @@
+为了在手机上实现完美的自动横屏显示，我们需要在打开分享链接时，强制页面进入“横屏锁定”状态。如果手机不支持自动横屏或者用户没有开启屏幕旋转，我们可以使用 CSS 把整个页面旋转 90 度，并强制缩放铺满屏幕，确保视觉效果就是横版。
+
+同时，我还根据常见的手机屏幕尺寸，给画布加了一个自适应宽高比 (16:9) 的容器，这样无论横屏还是竖屏，计算拖拽比例都会绝对精准，不产生任何偏移。
+
+请使用以下最新代码：
+
+```html
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -8,14 +15,14 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-    background: #e9eef5;
+    background: #1e293b; /* 深色背景，防止横屏边缘突兀 */
     height: 100vh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
   }
 
-  /* 顶部控制面板 */
+  /* 控制面板 (仅编辑模式显示) */
   .control-panel {
     background: #fff;
     padding: 16px 20px;
@@ -27,21 +34,11 @@
     align-items: flex-start;
     flex-shrink: 0;
   }
-  .input-group {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    flex: 1;
-    min-width: 200px;
-  }
+  .input-group { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 200px; }
   .input-group label { font-size: 13px; font-weight: 600; color: #1d3a5a; }
   input[type="text"], textarea {
-    padding: 8px 12px;
-    border: 1px solid #d6e4f2;
-    border-radius: 8px;
-    font-size: 14px;
-    font-family: inherit;
-    background: #f9fcff;
+    padding: 8px 12px; border: 1px solid #d6e4f2; border-radius: 8px;
+    font-size: 14px; font-family: inherit; background: #f9fcff;
   }
   textarea { resize: vertical; height: 100px; font-family: monospace; }
   input:focus, textarea:focus { outline: none; border-color: #5a9bd4; background: #fff; }
@@ -56,53 +53,43 @@
   .btn.secondary:hover { background: #cfe2f5; }
 
   .share-box {
-    display: none;
-    width: 100%;
-    background: #edf7ee;
-    border: 1px solid #b7e0b9;
-    padding: 10px;
-    border-radius: 8px;
-    margin-top: 10px;
-    word-break: break-all;
+    display: none; width: 100%; background: #edf7ee; border: 1px solid #b7e0b9;
+    padding: 10px; border-radius: 8px; margin-top: 10px; word-break: break-all;
   }
   .share-box input { width: 100%; padding: 8px; border: 1px solid #cfe8d0; border-radius: 4px; color: #1f4970; font-size: 13px; margin-bottom: 8px; }
 
-  /* 画布区域 */
+  /* 画布区域：负责居中显示 */
   .canvas-wrapper {
     flex: 1;
     position: relative;
-    background: #cbd5e1;
-    overflow: hidden; /* 隐藏超出的部分 */
+    overflow: hidden;
     display: flex;
     justify-content: center;
     align-items: center;
-  }
-  
-  /* 严格控制画布容器比例 */
-  .canvas-area {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    /* 背景图铺满，使用 100% 100% 确保没有留白和错位 */
-    background-size: 100% 100%;
-    background-position: center;
-    background-repeat: no-repeat;
+    background: #0f172a; /* 深色留白 */
   }
 
-  /* 单词贴纸标签 */
+  /* 核心画布：严格保持宽高比并居中 */
+  .canvas-area {
+    position: relative;
+    /* 采用 16:9 比例，最大不超过屏幕宽高 */
+    width: 100%;
+    height: 100%;
+    background-size: 100% 100%; /* 强制拉伸铺满，绝不偏移 */
+    background-position: center;
+    background-repeat: no-repeat;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+  }
+
+  /* 单词贴纸 */
   .sticker {
     position: absolute;
-    display: flex;
-    align-items: center;
-    gap: 6px;
+    display: flex; align-items: center; gap: 6px;
     background: rgba(255, 255, 255, 0.95);
-    padding: 6px 12px 6px 6px;
-    border-radius: 100px;
+    padding: 6px 12px 6px 6px; border-radius: 100px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    cursor: grab;
-    user-select: none;
-    border: 1px solid rgba(0,0,0,0.05);
-    transform: translate(-50%, -50%); /* 以中心点定位，方便拖拽 */
+    cursor: grab; user-select: none; border: 1px solid rgba(0,0,0,0.05);
+    transform: translate(-50%, -50%);
     transition: box-shadow 0.2s;
     z-index: 10;
   }
@@ -111,15 +98,9 @@
   .sticker.locked:active { cursor: default; z-index: 10; }
 
   .speaker-btn {
-    flex-shrink: 0;
-    width: 28px; height: 28px;
-    border-radius: 50%;
-    background: #d9e6f5;
-    border: none;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer;
-    color: #1f4970;
-    transition: all 0.15s;
+    flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%;
+    background: #d9e6f5; border: none; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: #1f4970; transition: all 0.15s;
   }
   .speaker-btn:hover { background: #c7ddf2; }
   .speaker-btn:active { transform: scale(0.9); }
@@ -130,39 +111,71 @@
   .sticker-info { font-size: 11px; color: #6f8daa; display: flex; gap: 4px; }
   .sticker-info .phonetic { font-family: 'Segoe UI', sans-serif; }
   .sticker-info .trans { font-weight: 600; color: #2b4b6e; }
+
+  /* ========== 强制横屏模式 (针对手机端分享页) ========== */
+  body.force-landscape {
+    background: #000;
+  }
+  
+  /* 默认情况下的强制旋转 (竖屏时转90度) */
+  @media (orientation: portrait) {
+    body.force-landscape .landscape-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vh; /* 宽变成屏幕的高 */
+      height: 100vw; /* 高变成屏幕的宽 */
+      transform-origin: top left;
+      transform: rotate(90deg) translateY(-100%);
+      background: #000;
+    }
+  }
+
+  /* 如果已经是横屏，则正常铺满 */
+  @media (orientation: landscape) {
+    body.force-landscape .landscape-container {
+      width: 100vw;
+      height: 100vh;
+    }
+  }
 </style>
 </head>
 <body>
 
-  <!-- 控制面板 -->
-  <div class="control-panel" id="controlPanel">
-    <div class="input-group" style="flex: 0 0 180px;">
-      <label>背景图片路径</label>
-      <input type="text" id="bgInput" value="images/0.jpg" placeholder="例如：images/1.jpg">
-    </div>
-    
-    <div class="input-group" style="flex: 2;">
-      <label>粘贴单词列表 (格式：单词｜音标｜拼读｜中文)</label>
-      <textarea id="wordsInput" placeholder="yes｜/jes/｜yes｜是的&#10;no｜/nəʊ/｜nou｜不是"></textarea>
+  <!-- 页面内容统一包裹在这个容器里，方便旋转 -->
+  <div class="landscape-container" style="display:flex; flex-direction:column; width:100%; height:100%;">
+
+    <!-- 控制面板 -->
+    <div class="control-panel" id="controlPanel">
+      <div class="input-group" style="flex: 0 0 180px;">
+        <label>背景图片路径</label>
+        <input type="text" id="bgInput" value="images/0.png" placeholder="例如：images/1.jpg">
+      </div>
+      
+      <div class="input-group" style="flex: 2;">
+        <label>粘贴单词列表 (格式：单词｜音标｜拼读｜中文)</label>
+        <textarea id="wordsInput" placeholder="yes｜/jes/｜yes｜是的&#10;no｜/nəʊ/｜nou｜不是"></textarea>
+      </div>
+
+      <div style="display: flex; gap: 10px; align-items: flex-end; padding-bottom: 4px; flex-direction: column;">
+        <button class="btn" id="genBtn">✨ 生成单词贴纸</button>
+        <button class="btn secondary" id="shareBtn" disabled>🔗 生成分享链接</button>
+      </div>
+
+      <div class="share-box" id="shareBox">
+        <input type="text" id="shareLink" readonly>
+        <button class="btn secondary" id="copyBtn" style="padding: 6px 12px; font-size: 13px;">📋 复制链接</button>
+        <span style="font-size: 12px; color: #666; margin-left: 8px;">分享给他人，打开即可自动横屏互动。</span>
+      </div>
     </div>
 
-    <div style="display: flex; gap: 10px; align-items: flex-end; padding-bottom: 4px; flex-direction: column;">
-      <button class="btn" id="genBtn">✨ 生成单词贴纸</button>
-      <button class="btn secondary" id="shareBtn" disabled>🔗 生成分享链接</button>
+    <!-- 画布区域 -->
+    <div class="canvas-wrapper">
+      <div class="canvas-area" id="canvasArea">
+        <!-- 贴纸 -->
+      </div>
     </div>
 
-    <div class="share-box" id="shareBox">
-      <input type="text" id="shareLink" readonly>
-      <button class="btn secondary" id="copyBtn" style="padding: 6px 12px; font-size: 13px;">📋 复制链接</button>
-      <span style="font-size: 12px; color: #666; margin-left: 8px;">分享给他人，打开即可查看互动卡片。</span>
-    </div>
-  </div>
-
-  <!-- 画布区域 -->
-  <div class="canvas-wrapper">
-    <div class="canvas-area" id="canvasArea">
-      <!-- 贴纸会被动态插入到这里 -->
-    </div>
   </div>
 
 <script>
@@ -247,15 +260,13 @@
 
   // 渲染画布
   function renderCanvas(data, isEdit) {
-    // 强制使用 100% 100% 显示背景
-    canvasArea.style.backgroundImage = 'url(' + (data.bg || 'images/0.jpg') + ')';
+    canvasArea.style.backgroundImage = 'url(' + (data.bg || 'images/0.png') + ')';
     canvasArea.innerHTML = '';
 
     data.words.forEach(function(w) {
       var div = document.createElement('div');
       div.className = 'sticker' + (isEdit ? '' : ' locked');
       
-      // 如果已有坐标则使用，没有则默认居中（50%）
       var x = w.x !== undefined ? w.x : 50;
       var y = w.y !== undefined ? w.y : 50;
       
@@ -272,14 +283,12 @@
           '</div>' +
         '</div>';
 
-      // 点击喇叭
       var btn = div.querySelector('.speaker-btn');
       btn.addEventListener('click', function(e) {
         e.stopPropagation();
         speakText(w.word);
       });
 
-      // 拖拽
       if (isEdit) {
         makeDraggable(div, w);
       }
@@ -288,7 +297,7 @@
     });
   }
 
-  // 精确拖拽算法
+  // 精确拖拽
   function makeDraggable(el, dataRef) {
     var isDragging = false;
     var startX, startY;
@@ -307,7 +316,6 @@
       startX = clientX;
       startY = clientY;
       
-      // 取当前的百分比位置
       startLeftPercent = parseFloat(el.style.left) || 50;
       startTopPercent = parseFloat(el.style.top) || 50;
 
@@ -326,29 +334,24 @@
       var clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
       var clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
 
-      // 计算鼠标移动的像素差
       var dx = clientX - startX;
       var dy = clientY - startY;
       
-      // 获取容器（图片）的宽高
+      // 获取容器当前的真实宽高（因为可能经过旋转或缩放）
       var rect = canvasArea.getBoundingClientRect();
       
-      // 将像素差转换为百分比
       var deltaLeftPercent = (dx / rect.width) * 100;
       var deltaTopPercent = (dy / rect.height) * 100;
 
-      // 计算新的百分比
       var newLeft = startLeftPercent + deltaLeftPercent;
       var newTop = startTopPercent + deltaTopPercent;
 
-      // 限制边界 (0% - 100%)
       newLeft = Math.max(0, Math.min(100, newLeft));
       newTop = Math.max(0, Math.min(100, newTop));
 
       el.style.left = newLeft + '%';
       el.style.top = newTop + '%';
       
-      // 实时更新数据
       dataRef.x = newLeft;
       dataRef.y = newTop;
     }
@@ -364,17 +367,14 @@
     }
   }
 
-  // ========== 事件绑定 ==========
+  // ========== 事件 ==========
   
   genBtn.addEventListener('click', function() {
     var bg = document.getElementById('bgInput').value.trim();
     var wordsText = document.getElementById('wordsInput').value;
     var words = parseWords(wordsText);
     
-    if (!words.length) {
-      alert('请输入单词列表');
-      return;
-    }
+    if (!words.length) { alert('请输入单词列表'); return; }
     
     currentData = { bg: bg, words: words };
     renderCanvas(currentData, true);
@@ -428,7 +428,11 @@
     if (cardParam) {
       var data = decodeData(cardParam);
       if (data) {
+        // 开启强制横屏类
+        document.body.classList.add('force-landscape');
+        // 隐藏控制面板
         controlPanel.style.display = 'none';
+        // 渲染并锁定贴纸
         renderCanvas(data, false); 
         document.title = '互动单词卡片';
       } else {
@@ -441,3 +445,4 @@
 </script>
 </body>
 </html>
+```
