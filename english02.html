@@ -3,30 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>互动单词贴纸</title>
+<title>互动单词卡片</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
+  
+  /* 页面底色保持纯黑，防止旋转后边缘漏出白色 */
+  html, body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background: #000;
+    overflow: hidden; /* 禁止滚动 */
     font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-    background: #0f172a;
-    height: 100vh;
-    width: 100vw;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
   }
 
-  /* ========== 控制面板 ========== */
+  /* ========== 编辑控制面板 ========== */
   .control-panel {
-    background: #fff;
-    padding: 16px 20px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    z-index: 100;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    align-items: flex-start;
-    flex-shrink: 0;
+    background: #fff; padding: 16px 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    z-index: 100; display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start;
   }
   .input-group { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 200px; }
   .input-group label { font-size: 13px; font-weight: 600; color: #1d3a5a; }
@@ -52,47 +47,54 @@
   }
   .share-box input { width: 100%; padding: 8px; border: 1px solid #cfe8d0; border-radius: 4px; color: #1f4970; font-size: 13px; margin-bottom: 8px; }
 
-  /* ========== 画布区域 ========== */
+  /* ========== 核心画布 ========== */
   .canvas-wrapper {
-    flex: 1;
-    position: relative;
+    position: absolute; /* 使用绝对定位铺满屏幕 */
+    top: 0;
+    left: 0;
     width: 100%;
     height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background: #000;
     overflow: hidden;
+    background: #000;
   }
 
-  /* 核心画布 */
-  .canvas-area {
+  /* 只有编辑时，控制面板占据顶部 */
+  .edit-mode .canvas-wrapper {
+    top: auto;
     position: relative;
-    width: 100%;
-    height: 100%;
-    background-size: 100% 100%; /* 100% 100% 保证坐标绝对精准 */
+    flex: 1;
+    height: calc(100% - 200px); /* 粗略减去面板高度 */
+  }
+
+  /* 真正的画布 */
+  .canvas-area {
+    position: absolute;
+    background-size: 100% 100%; /* 100% 100% 保证图片不变形，坐标严格对应 */
     background-position: center;
     background-repeat: no-repeat;
-    transition: transform 0.3s ease;
   }
 
-  /* 
-   * 竖屏状态下强制旋转 
-   * 为了让图片保持比例（比如 16:9），我们让宽度=100vh，高度=100vw，然后旋转 90 度
-   */
+  /* 正常横屏时（手机横过来，或者电脑上） */
+  .canvas-area {
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+  }
+
+  /* 竖屏时的特殊处理：把画布旋转 90 度撑满屏幕，且不变形 */
   @media (orientation: portrait) {
+    /* 如果是分享模式，画布占满整个手机屏幕并旋转 */
     body.share-mode .canvas-area {
-      transform: rotate(90deg);
-      width: 100vh;
-      height: 100vw;
-    }
-    /* 把里面的单词标签反向旋转回来，保证字是正的 */
-    body.share-mode .sticker {
-      transform: translate(-50%, -50%) rotate(-90deg);
+      width: 100vh; /* 宽=屏幕的高 */
+      height: 100vw; /* 高=屏幕的宽 */
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(90deg);
     }
   }
 
-  /* 单词贴纸 */
+  /* 单词标签 */
   .sticker {
     position: absolute;
     display: flex; align-items: center; gap: 6px;
@@ -101,12 +103,18 @@
     box-shadow: 0 4px 12px rgba(0,0,0,0.2);
     cursor: grab; user-select: none; border: 1px solid rgba(0,0,0,0.05);
     transform: translate(-50%, -50%);
-    transition: box-shadow 0.2s, transform 0.3s;
     z-index: 10;
   }
   .sticker:active { cursor: grabbing; box-shadow: 0 8px 20px rgba(0,0,0,0.3); z-index: 999; }
   .sticker.locked { cursor: default; }
   .sticker.locked:active { cursor: default; z-index: 10; }
+
+  /* 竖屏下，为了字是正的，标签反向旋转 */
+  @media (orientation: portrait) {
+    body.share-mode .sticker {
+      transform: translate(-50%, -50%) rotate(-90deg);
+    }
+  }
 
   .speaker-btn {
     flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%;
@@ -122,6 +130,14 @@
   .sticker-info { font-size: 11px; color: #6f8daa; display: flex; gap: 4px; white-space: nowrap; }
   .sticker-info .phonetic { font-family: 'Segoe UI', sans-serif; }
   .sticker-info .trans { font-weight: 600; color: #2b4b6e; }
+
+  /* 竖屏提示浮窗 */
+  .toast {
+    position: fixed; top: 20%; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.8); color: #fff; padding: 10px 20px; border-radius: 30px;
+    font-size: 14px; z-index: 9999; pointer-events: none; opacity: 0; transition: opacity 0.5s;
+    display: flex; align-items: center; gap: 8px; white-space: nowrap;
+  }
 </style>
 </head>
 <body>
@@ -145,13 +161,15 @@
     <div class="share-box" id="shareBox">
       <input type="text" id="shareLink" readonly>
       <button class="btn secondary" id="copyBtn" style="padding: 6px 12px; font-size: 13px;">📋 复制链接</button>
-      <span style="font-size: 12px; color: #666; margin-left: 8px;">分享给他人，打开即可自动全屏横屏浏览。</span>
+      <span style="font-size: 12px; color: #666; margin-left: 8px;">分享给他人，打开即可自动横屏浏览。</span>
     </div>
   </div>
 
   <div class="canvas-wrapper" id="canvasWrapper">
     <div class="canvas-area" id="canvasArea"></div>
   </div>
+
+  <div class="toast" id="toast">📱 请横屏使用以获得最佳体验</div>
 
 <script>
 (function(){
@@ -189,7 +207,7 @@
     });
   }
 
-  // ========== 数据编解码 ==========
+  // ========== 编解码 ==========
   function encodeData(obj) {
     var json = JSON.stringify(obj);
     var b64 = btoa(unescape(encodeURIComponent(json)));
@@ -226,9 +244,11 @@
   var shareBox = document.getElementById('shareBox');
   var shareBtn = document.getElementById('shareBtn');
   var genBtn = document.getElementById('genBtn');
+  var toast = document.getElementById('toast');
   
   var currentData = { bg: '', words: [] };
 
+  // 渲染
   function renderCanvas(data, isEdit) {
     canvasArea.style.backgroundImage = 'url(' + (data.bg || 'images/0.png') + ')';
     canvasArea.innerHTML = '';
@@ -268,7 +288,7 @@
     });
   }
 
-  // 拖拽算法 (适配横竖屏)
+  // 拖拽算法（兼容竖屏旋转后的坐标轴互换）
   function makeDraggable(el, dataRef) {
     var isDragging = false;
     var startX, startY;
@@ -306,20 +326,19 @@
       var dx = clientX - startX;
       var dy = clientY - startY;
       
-      // 获取容器当前的“物理像素”尺寸（受旋转影响）
+      // 获取容器的物理尺寸
       var rect = canvasArea.getBoundingClientRect();
       
       var deltaLeftPercent, deltaTopPercent;
       
-      // 检查是否处于强制旋转的竖屏分享模式
+      // 竖屏且处于分享/旋转模式
       if (document.body.classList.contains('share-mode') && window.innerHeight > window.innerWidth) {
-        // 旋转了 90 度后：
-        // 鼠标向右移动 (dx>0)，对应标签在本地坐标系中向下移动 (top 增加)
-        // 鼠标向下移动 (dy>0)，对应标签在本地坐标系中向左移动 (left 减少)
+        // 物理横向移动 dx 实际上是在增加本地 Y 坐标
         deltaTopPercent = (dx / rect.width) * 100;
+        // 物理纵向移动 dy 实际上是在减少本地 X 坐标
         deltaLeftPercent = -(dy / rect.height) * 100;
       } else {
-        // 正常横屏（无旋转）
+        // 正常横屏
         deltaLeftPercent = (dx / rect.width) * 100;
         deltaTopPercent = (dy / rect.height) * 100;
       }
@@ -391,6 +410,15 @@
     }
   });
 
+  // 竖屏时的提示浮窗检测
+  function checkOrientation() {
+    if (document.body.classList.contains('share-mode') && window.innerHeight > window.innerWidth) {
+      toast.style.opacity = '1';
+      setTimeout(function(){ toast.style.opacity = '0'; }, 3000);
+    }
+  }
+  window.addEventListener('resize', checkOrientation);
+
   // ========== 初始化 ==========
   window.addEventListener('DOMContentLoaded', function() {
     document.getElementById('wordsInput').value = 
@@ -413,9 +441,13 @@
         controlPanel.style.display = 'none';
         renderCanvas(data, false); 
         document.title = '互动单词卡片';
+        checkOrientation();
       } else {
         alert('分享链接解析失败或已损坏');
       }
+    } else {
+      // 编辑模式：允许滚动和查看
+      document.body.classList.add('edit-mode');
     }
   });
 
