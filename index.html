@@ -23,7 +23,7 @@
   textarea {
     width: 100%; padding: 12px 14px; border: 1.5px solid #d6e4f2; border-radius: 14px;
     font-size: .95rem; font-family: inherit; background: #f9fcff; color: #13293d;
-    resize: vertical; transition: border-color .15s;
+    resize: vertical; transition: border-color .15s; line-height: 1.7;
   }
   textarea:focus { outline: none; border-color: #5a9bd4; background: #fff; }
   .row { margin-bottom: 18px; }
@@ -104,12 +104,17 @@
 
     <div class="panel">
       <div class="row">
-        <label>📝 单词列表 <span class="hint">每行一个：单词 | 音标 | 拼读 | 中文</span></label>
-        <textarea id="wordInput" rows="6"></textarea>
-      </div>
-      <div class="row">
-        <label>✅ 配套句子 <span class="hint">每行一个：英文句子 | 中文翻译</span></label>
-        <textarea id="sentenceInput" rows="3"></textarea>
+        <label>📋 粘贴内容 <span class="hint">直接粘贴你的学习卡片模板</span></label>
+        <textarea id="contentInput" rows="16" placeholder="第 4 天
+yes｜/jes/｜yes｜是的
+no｜/nəʊ/｜nou｜不是
+ok｜/əʊˈkeɪ/｜ou-kei｜好的
+good｜/ɡʊd/｜gu-de｜好
+right｜/raɪt/｜rai-te｜对的
+
+✅配套句子
+1. This is a cap. 这是一顶帽子。
+2. This is a dog. 这是一只狗。"></textarea>
       </div>
       <button class="btn" id="generateBtn">✨ 生成分享链接</button>
 
@@ -179,43 +184,36 @@
     if (!playQueue.length) { isPlaying = false; return; }
     isPlaying = true;
     var text = playQueue.shift();
-    var doSpeak = function() {
-      speakYoudao(text).then(function(a){ 
+    speakYoudao(text).then(function(a){ 
+      currentAudio = a;
+      a.onended = function(){ playNext(); };
+    }).catch(function(){
+      speakBaidu(text).then(function(a){
         currentAudio = a;
         a.onended = function(){ playNext(); };
       }).catch(function(){
-        speakBaidu(text).then(function(a){
-          currentAudio = a;
-          a.onended = function(){ playNext(); };
-        }).catch(function(){
-          playNext();
-        });
+        playNext();
       });
-    };
-    doSpeak();
+    });
   }
 
-  // 入口：任何文本
   function speak(text) {
     if (!text || !text.trim()) return;
     stopAll();
     var clean = cleanText(text);
     if (!clean) return;
 
-    // 1. 先尝试整句（有道→百度）
     speakYoudao(clean).then(function(a){
       currentAudio = a;
     }).catch(function(){
       speakBaidu(clean).then(function(a){
         currentAudio = a;
       }).catch(function(){
-        // 2. 都失败，拆成单词逐个播放
         var parts = clean.split(/\s+/).filter(Boolean);
         if (parts.length > 1) {
           playQueue = parts.slice();
           playNext();
         } else {
-          // 3. 单词也失败，用浏览器
           if ('speechSynthesis' in window) {
             var u = new SpeechSynthesisUtterance(clean);
             u.lang = 'en-US'; u.rate = 0.9;
@@ -244,18 +242,76 @@
     } catch(e) { return null; }
   }
 
-  // ========== 解析输入 ==========
-  function parseWords(text) {
-    return text.split('\n').map(function(l){return l.trim();}).filter(Boolean).map(function(line){
-      var p = line.split('|').map(function(s){return s.trim();});
-      return { word:p[0]||'', phonetic:p[1]||'', respell:p[2]||'', trans:p[3]||'' };
-    });
-  }
-  function parseSentences(text) {
-    return text.split('\n').map(function(l){return l.trim();}).filter(Boolean).map(function(line){
-      var p = line.split('|').map(function(s){return s.trim();});
-      return { en:p[0]||'', cn:p[1]||'' };
-    });
+  // ========== 解析粘贴内容 ==========
+  // 支持模板：
+  // 第 4 天
+  // yes｜/jes/｜yes｜是的
+  // ...
+  // ✅配套句子
+  // 1. This is a cap. 这是一顶帽子。
+  // 2. This is a dog. 这是一只狗。
+  function parseContent(text) {
+    var lines = text.split('\n');
+    var title = '';
+    var words = [];
+    var sentences = [];
+    var inSentenceSection = false;
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].trim();
+      if (!line) continue;
+
+      // 标题行：第 X 天
+      if (/^第\s*\d+\s*天/.test(line)) {
+        title = line;
+        continue;
+      }
+
+      // 配套句子区块标记
+      if (/^✅\s*配套句子/.test(line) || /^配套句子/.test(line)) {
+        inSentenceSection = true;
+        continue;
+      }
+
+      if (inSentenceSection) {
+        // 句子行：去掉编号 "1. " 或 "1、"
+        var s = line.replace(/^\d+[\.、\s]+/, '').trim();
+        if (!s) continue;
+        // 拆分英文和中文：最后一个中文字符串之前是英文
+        // 规则：在连续的英文字符/标点之后出现中文，则在第一个中文处分割
+        var en = '', cn = '';
+        // 找到第一个中文字符的位置
+        var cnIndex = -1;
+        for (var j = 0; j < s.length; j++) {
+          if (/[\u4e00-\u9fa5]/.test(s[j])) {
+            cnIndex = j;
+            break;
+          }
+        }
+        if (cnIndex > 0) {
+          en = s.slice(0, cnIndex).trim();
+          cn = s.slice(cnIndex).trim();
+        } else {
+          en = s;
+          cn = '';
+        }
+        // 去掉英文末尾可能的句号前的空格，保留句号
+        sentences.push({ en: en, cn: cn });
+      } else {
+        // 单词行：用｜或|分隔
+        var parts = line.split(/[｜|]/).map(function(x){return x.trim();});
+        if (parts.length >= 1 && parts[0]) {
+          words.push({
+            word: parts[0] || '',
+            phonetic: parts[1] || '',
+            respell: parts[2] || '',
+            trans: parts[3] || ''
+          });
+        }
+      }
+    }
+
+    return { title: title, words: words, sentences: sentences };
   }
 
   // ========== 渲染 ==========
@@ -269,7 +325,12 @@
   function renderCard(container, data) {
     var words = data.words || [];
     var sentences = data.sentences || [];
+    var title = data.title || '';
     var html = '';
+
+    if (title) {
+      html += '<div class="card-title">' + esc(title) + '</div>';
+    }
 
     if (words.length) {
       html += '<div class="word-list">';
@@ -316,21 +377,24 @@
   var shareLinkEl = document.getElementById('shareLink');
 
   // 示例数据
-  document.getElementById('wordInput').value =
-    'wall | /wɔːl/ | wo | 墙\n' +
-    'bed | /bed/ | bei-de | 床\n' +
-    'pillow | /ˈpɪləʊ/ | pi-lo | 枕头\n' +
-    'quilt | /kwɪlt/ | kwi-erlt | 被子\n' +
-    'night table | /naɪt ˈteɪbl/ | nai-tei-bo | 床头柜';
-  document.getElementById('sentenceInput').value =
-    'This is a bed. | 这是一张床。\n' +
-    'This is a pillow. | 这是一个枕头。';
+  document.getElementById('contentInput').value =
+    '第 4 天\n' +
+    'yes｜/jes/｜yes｜是的\n' +
+    'no｜/nəʊ/｜nou｜不是\n' +
+    'ok｜/əʊˈkeɪ/｜ou-kei｜好的\n' +
+    'good｜/ɡʊd/｜gu-de｜好\n' +
+    'right｜/raɪt/｜rai-te｜对的\n' +
+    '\n' +
+    '✅配套句子\n' +
+    '1. This is a cap. 这是一顶帽子。\n' +
+    '2. This is a dog. 这是一只狗。';
 
   document.getElementById('generateBtn').addEventListener('click', function(){
-    var words = parseWords(document.getElementById('wordInput').value);
-    var sentences = parseSentences(document.getElementById('sentenceInput').value);
-    if (!words.length && !sentences.length) { alert('请至少填写一个单词或句子'); return; }
-    var data = { words: words, sentences: sentences };
+    var data = parseContent(document.getElementById('contentInput').value);
+    if (!data.words.length && !data.sentences.length) {
+      alert('没有解析到内容，请检查格式');
+      return;
+    }
     var encoded = encodeData(data);
     var link = location.origin + location.pathname + '?card=' + encoded;
     shareLinkEl.textContent = link;
@@ -361,10 +425,12 @@
   }
 
   document.getElementById('previewBtn').addEventListener('click', function(){
-    var words = parseWords(document.getElementById('wordInput').value);
-    var sentences = parseSentences(document.getElementById('sentenceInput').value);
-    if (!words.length && !sentences.length) { alert('请至少填写一个单词或句子'); return; }
-    renderCard(cardContent, { words: words, sentences: sentences });
+    var data = parseContent(document.getElementById('contentInput').value);
+    if (!data.words.length && !data.sentences.length) {
+      alert('没有解析到内容，请检查格式');
+      return;
+    }
+    renderCard(cardContent, data);
     generatorPanel.style.display = 'none';
     cardView.style.display = 'block';
   });
