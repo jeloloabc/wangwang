@@ -1,1 +1,396 @@
-欢迎光临！
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>学习卡片生成器</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(145deg, #f3f6fc, #e9eef5);
+    min-height: 100vh; display: flex; justify-content: center; padding: 20px;
+  }
+  .app { max-width: 760px; width: 100%; }
+  h1 { font-size: 1.6rem; color: #1e2b3c; margin-bottom: 4px; }
+  .sub { color: #6f8daa; font-size: .9rem; margin-bottom: 20px; }
+  .panel {
+    background: #fff; border-radius: 24px; padding: 24px;
+    box-shadow: 0 20px 40px -12px rgba(0,20,40,.2); margin-bottom: 20px;
+  }
+  label { display: block; font-weight: 600; color: #1d3a5a; margin-bottom: 6px; font-size: .95rem; }
+  .hint { font-weight: 400; color: #97afc5; font-size: .8rem; margin-left: 6px; }
+  textarea {
+    width: 100%; padding: 12px 14px; border: 1.5px solid #d6e4f2; border-radius: 14px;
+    font-size: .95rem; font-family: inherit; background: #f9fcff; color: #13293d;
+    resize: vertical; transition: border-color .15s;
+  }
+  textarea:focus { outline: none; border-color: #5a9bd4; background: #fff; }
+  .row { margin-bottom: 18px; }
+  .btn {
+    background: #2b6cb0; color: #fff; border: none; border-radius: 100px;
+    padding: 12px 28px; font-size: 1rem; font-weight: 600; cursor: pointer;
+    transition: all .15s; box-shadow: 0 6px 14px rgba(43,108,176,.3);
+  }
+  .btn:hover { background: #245a94; transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+  .btn.secondary { background: #e2effb; color: #1f4970; box-shadow: none; }
+  .btn.secondary:hover { background: #cfe2f5; }
+  .result-box {
+    display: none; margin-top: 16px; background: #edf7ee; border: 1.5px solid #b7e0b9;
+    border-radius: 16px; padding: 16px; word-break: break-all;
+  }
+  .result-box.show { display: block; }
+  .result-box .label { font-weight: 600; color: #2c6e2f; margin-bottom: 8px; font-size: .9rem; }
+  .link-text {
+    background: #fff; padding: 10px 12px; border-radius: 10px;
+    border: 1px solid #cfe8d0; font-size: .85rem; color: #1f4970;
+    font-family: monospace; margin-bottom: 10px;
+  }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+  #cardView { display: none; }
+  .card-container {
+    background: #fff; border-radius: 40px; padding: 28px 22px 32px;
+    box-shadow: 0 25px 40px -12px rgba(0,20,40,.25);
+    border: 1px solid rgba(255,255,255,.6);
+  }
+  .card-title { font-size: 1.4rem; font-weight: 600; color: #1e2b3c; margin-bottom: 20px; padding-left: 6px; }
+  .word-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 26px; }
+  .word-item {
+    display: flex; align-items: center; gap: 12px; background: #f9fcff;
+    border-radius: 100px; padding: 8px 12px 8px 8px; border: 1px solid #e2eaf2;
+  }
+  .speaker {
+    flex-shrink: 0; width: 48px; height: 48px; border-radius: 50%;
+    background: #d9e6f5; border: none; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: #1f4970; transition: all .15s;
+    box-shadow: 0 3px 8px rgba(0,70,130,.1); border: 1px solid rgba(255,255,255,.7);
+  }
+  .speaker:hover { background: #c7ddf2; transform: scale(1.03); }
+  .speaker:active { transform: scale(.96); background: #b3cfe8; }
+  .speaker svg { width: 26px; height: 26px; fill: currentColor; }
+  .content { flex: 1; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; line-height: 1.4; }
+  .word { font-weight: 700; font-size: 1.25rem; color: #13293d; min-width: 80px; }
+  .phonetic { color: #3f627f; font-size: .95rem; background: #e8f0f9; padding: 2px 8px; border-radius: 30px; }
+  .respell { color: #6f8daa; font-size: .9rem; font-style: italic; background: #f0f5fb; padding: 2px 8px; border-radius: 30px; }
+  .trans { color: #2b4b6e; font-size: .95rem; font-weight: 500; margin-left: auto; background: #f0f6fe; padding: 2px 10px; border-radius: 40px; white-space: nowrap; }
+  .sentence-box { background: #edf4fc; border-radius: 28px; padding: 18px 18px 14px; border: 1px solid #d6e4f2; }
+  .sentence-title { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; font-size: 1.1rem; font-weight: 600; color: #1d3a5a; }
+  .sentence-list { display: flex; flex-direction: column; gap: 12px; }
+  .sentence-item { display: flex; align-items: center; gap: 12px; background: #fff; border-radius: 100px; padding: 8px 16px 8px 8px; border: 1px solid #d9e6f2; }
+  .sentence-item .speaker { width: 44px; height: 44px; background: #e2effb; }
+  .sentence-item .speaker svg { width: 24px; height: 24px; }
+  .sentence-text { flex: 1; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; }
+  .en { font-weight: 500; font-size: 1.05rem; color: #173753; }
+  .cn { color: #4a6d8c; font-size: .95rem; margin-left: auto; background: #f1f8ff; padding: 2px 14px; border-radius: 30px; white-space: nowrap; }
+  @media (max-width: 540px) {
+    .word { font-size: 1.1rem; min-width: 60px; }
+    .phonetic, .respell, .trans { font-size: .82rem; padding: 1px 7px; }
+    .cn { white-space: normal; margin-left: 0; background: transparent; padding-left: 0; font-size: .85rem; }
+    .sentence-text { flex-direction: column; align-items: flex-start; gap: 2px; }
+    .speaker { width: 42px; height: 42px; }
+    .speaker svg { width: 22px; height: 22px; }
+    .card-container { padding: 20px 16px 24px; border-radius: 30px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div id="generatorPanel">
+    <h1>📘 学习卡片生成器</h1>
+    <p class="sub">粘贴内容 → 生成分享链接 → 别人打开即可听读</p>
+
+    <div class="panel">
+      <div class="row">
+        <label>📝 单词列表 <span class="hint">每行一个：单词 | 音标 | 拼读 | 中文</span></label>
+        <textarea id="wordInput" rows="6"></textarea>
+      </div>
+      <div class="row">
+        <label>✅ 配套句子 <span class="hint">每行一个：英文句子 | 中文翻译</span></label>
+        <textarea id="sentenceInput" rows="3"></textarea>
+      </div>
+      <button class="btn" id="generateBtn">✨ 生成分享链接</button>
+
+      <div class="result-box" id="resultBox">
+        <div class="label">✅ 分享链接已生成（复制后发给别人）</div>
+        <div class="link-text" id="shareLink"></div>
+        <div class="btn-row">
+          <button class="btn secondary" id="copyBtn">📋 复制链接</button>
+          <button class="btn secondary" id="previewBtn">👁️ 预览卡片</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="cardView">
+    <div class="card-container" id="cardContent"></div>
+    <div style="text-align:center;margin-top:20px;">
+      <button class="btn secondary" id="backBtn">← 返回编辑</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  // ========== 发音核心 ==========
+  var currentAudio = null;
+  var playQueue = [];
+  var isPlaying = false;
+
+  function cleanText(t) {
+    return (t || '').trim().replace(/[.?!]+$/g, '').trim();
+  }
+
+  function playUrl(url) {
+    return new Promise(function(resolve, reject) {
+      var audio = new Audio(url);
+      var timer = setTimeout(function(){ reject(new Error('timeout')); }, 4000);
+      audio.oncanplaythrough = function() {
+        clearTimeout(timer);
+        resolve(audio);
+      };
+      audio.onerror = function() {
+        clearTimeout(timer);
+        reject(new Error('error'));
+      };
+      audio.play().catch(function(){ clearTimeout(timer); reject(new Error('play')); });
+    });
+  }
+
+  function speakYoudao(text) {
+    var enc = encodeURIComponent(text);
+    return playUrl('https://dict.youdao.com/dictvoice?audio=' + enc + '&type=2');
+  }
+  function speakBaidu(text) {
+    var enc = encodeURIComponent(text);
+    return playUrl('https://fanyi.baidu.com/gettts?lan=en&text=' + enc + '&spd=3&source=web');
+  }
+
+  function stopAll() {
+    if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+    playQueue = [];
+    isPlaying = false;
+  }
+
+  function playNext() {
+    if (!playQueue.length) { isPlaying = false; return; }
+    isPlaying = true;
+    var text = playQueue.shift();
+    var doSpeak = function() {
+      speakYoudao(text).then(function(a){ 
+        currentAudio = a;
+        a.onended = function(){ playNext(); };
+      }).catch(function(){
+        speakBaidu(text).then(function(a){
+          currentAudio = a;
+          a.onended = function(){ playNext(); };
+        }).catch(function(){
+          playNext();
+        });
+      });
+    };
+    doSpeak();
+  }
+
+  // 入口：任何文本
+  function speak(text) {
+    if (!text || !text.trim()) return;
+    stopAll();
+    var clean = cleanText(text);
+    if (!clean) return;
+
+    // 1. 先尝试整句（有道→百度）
+    speakYoudao(clean).then(function(a){
+      currentAudio = a;
+    }).catch(function(){
+      speakBaidu(clean).then(function(a){
+        currentAudio = a;
+      }).catch(function(){
+        // 2. 都失败，拆成单词逐个播放
+        var parts = clean.split(/\s+/).filter(Boolean);
+        if (parts.length > 1) {
+          playQueue = parts.slice();
+          playNext();
+        } else {
+          // 3. 单词也失败，用浏览器
+          if ('speechSynthesis' in window) {
+            var u = new SpeechSynthesisUtterance(clean);
+            u.lang = 'en-US'; u.rate = 0.9;
+            var vs = window.speechSynthesis.getVoices();
+            var v = vs.find(function(x){return x.lang==='en-US';}) || vs.find(function(x){return x.lang.indexOf('en')===0;});
+            if (v) u.voice = v;
+            window.speechSynthesis.cancel();
+            window.speechSynthesis.speak(u);
+          }
+        }
+      });
+    });
+  }
+
+  // ========== 数据编码 ==========
+  function encodeData(obj) {
+    var json = JSON.stringify(obj);
+    var b64 = btoa(unescape(encodeURIComponent(json)));
+    return b64.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  }
+  function decodeData(str) {
+    try {
+      var b64 = str.replace(/-/g,'+').replace(/_/g,'/');
+      while (b64.length % 4) b64 += '=';
+      return JSON.parse(decodeURIComponent(escape(atob(b64))));
+    } catch(e) { return null; }
+  }
+
+  // ========== 解析输入 ==========
+  function parseWords(text) {
+    return text.split('\n').map(function(l){return l.trim();}).filter(Boolean).map(function(line){
+      var p = line.split('|').map(function(s){return s.trim();});
+      return { word:p[0]||'', phonetic:p[1]||'', respell:p[2]||'', trans:p[3]||'' };
+    });
+  }
+  function parseSentences(text) {
+    return text.split('\n').map(function(l){return l.trim();}).filter(Boolean).map(function(line){
+      var p = line.split('|').map(function(s){return s.trim();});
+      return { en:p[0]||'', cn:p[1]||'' };
+    });
+  }
+
+  // ========== 渲染 ==========
+  var SPEAKER_SVG = '<svg viewBox="0 0 24 24"><path d="M3 10v4c0 1.1.9 2 2 2h2.5l4.5 3.5V4.5L7.5 8H5c-1.1 0-2 .9-2 2z"/><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/><path d="M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>';
+
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});
+  }
+  function attr(s) { return String(s).replace(/"/g,'&quot;'); }
+
+  function renderCard(container, data) {
+    var words = data.words || [];
+    var sentences = data.sentences || [];
+    var html = '';
+
+    if (words.length) {
+      html += '<div class="word-list">';
+      words.forEach(function(w){
+        html += '<div class="word-item">' +
+          '<button class="speaker" data-say="' + attr(w.word) + '">' + SPEAKER_SVG + '</button>' +
+          '<div class="content">' +
+            '<span class="word">' + esc(w.word) + '</span>' +
+            (w.phonetic ? '<span class="phonetic">' + esc(w.phonetic) + '</span>' : '') +
+            (w.respell ? '<span class="respell">' + esc(w.respell) + '</span>' : '') +
+            (w.trans ? '<span class="trans">' + esc(w.trans) + '</span>' : '') +
+          '</div></div>';
+      });
+      html += '</div>';
+    }
+
+    if (sentences.length) {
+      html += '<div class="sentence-box"><div class="sentence-title">✅ 配套句子</div><div class="sentence-list">';
+      sentences.forEach(function(s){
+        html += '<div class="sentence-item">' +
+          '<button class="speaker" data-say="' + attr(s.en) + '">' + SPEAKER_SVG + '</button>' +
+          '<div class="sentence-text">' +
+            '<span class="en">' + esc(s.en) + '</span>' +
+            (s.cn ? '<span class="cn">' + esc(s.cn) + '</span>' : '') +
+          '</div></div>';
+      });
+      html += '</div></div>';
+    }
+
+    container.innerHTML = html;
+    container.querySelectorAll('[data-say]').forEach(function(btn){
+      btn.addEventListener('click', function(e){
+        e.stopPropagation();
+        speak(this.getAttribute('data-say'));
+      });
+    });
+  }
+
+  // ========== 页面逻辑 ==========
+  var generatorPanel = document.getElementById('generatorPanel');
+  var cardView = document.getElementById('cardView');
+  var cardContent = document.getElementById('cardContent');
+  var resultBox = document.getElementById('resultBox');
+  var shareLinkEl = document.getElementById('shareLink');
+
+  // 示例数据
+  document.getElementById('wordInput').value =
+    'wall | /wɔːl/ | wo | 墙\n' +
+    'bed | /bed/ | bei-de | 床\n' +
+    'pillow | /ˈpɪləʊ/ | pi-lo | 枕头\n' +
+    'quilt | /kwɪlt/ | kwi-erlt | 被子\n' +
+    'night table | /naɪt ˈteɪbl/ | nai-tei-bo | 床头柜';
+  document.getElementById('sentenceInput').value =
+    'This is a bed. | 这是一张床。\n' +
+    'This is a pillow. | 这是一个枕头。';
+
+  document.getElementById('generateBtn').addEventListener('click', function(){
+    var words = parseWords(document.getElementById('wordInput').value);
+    var sentences = parseSentences(document.getElementById('sentenceInput').value);
+    if (!words.length && !sentences.length) { alert('请至少填写一个单词或句子'); return; }
+    var data = { words: words, sentences: sentences };
+    var encoded = encodeData(data);
+    var link = location.origin + location.pathname + '?card=' + encoded;
+    shareLinkEl.textContent = link;
+    resultBox.classList.add('show');
+  });
+
+  document.getElementById('copyBtn').addEventListener('click', function(){
+    var link = shareLinkEl.textContent;
+    if (!link) return;
+    var btn = this;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(link).then(function(){
+        btn.textContent = '✅ 已复制';
+        setTimeout(function(){ btn.textContent = '📋 复制链接'; }, 1500);
+      }).catch(function(){ fallbackCopy(link, btn); });
+    } else { fallbackCopy(link, btn); }
+  });
+  function fallbackCopy(text, btn) {
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    try {
+      document.execCommand('copy');
+      btn.textContent = '✅ 已复制';
+      setTimeout(function(){ btn.textContent = '📋 复制链接'; }, 1500);
+    } catch(e) { alert('复制失败，请手动复制'); }
+    document.body.removeChild(ta);
+  }
+
+  document.getElementById('previewBtn').addEventListener('click', function(){
+    var words = parseWords(document.getElementById('wordInput').value);
+    var sentences = parseSentences(document.getElementById('sentenceInput').value);
+    if (!words.length && !sentences.length) { alert('请至少填写一个单词或句子'); return; }
+    renderCard(cardContent, { words: words, sentences: sentences });
+    generatorPanel.style.display = 'none';
+    cardView.style.display = 'block';
+  });
+
+  document.getElementById('backBtn').addEventListener('click', function(){
+    cardView.style.display = 'none';
+    generatorPanel.style.display = 'block';
+  });
+
+  // 加载时检测 URL 参数
+  window.addEventListener('DOMContentLoaded', function(){
+    var params = new URLSearchParams(location.search);
+    var cardParam = params.get('card');
+    if (cardParam) {
+      var data = decodeData(cardParam);
+      if (data) {
+        generatorPanel.style.display = 'none';
+        cardView.style.display = 'block';
+        renderCard(cardContent, data);
+        document.title = '📘 学习卡片';
+      } else {
+        alert('链接内容解析失败');
+      }
+    }
+  });
+})();
+</script>
+</body>
+</html>
